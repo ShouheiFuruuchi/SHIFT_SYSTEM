@@ -1,0 +1,646 @@
+import pandas as pd
+import openpyxl as pyxl
+import os
+import numpy as np
+
+tenpo = [
+  
+    ["01001008 FUN柏","柏"],
+    ["01001009 FUN千葉C-one","千葉"],
+    ["01001028 FUNスマーク伊勢崎","伊勢崎"],
+    ["01001034 FUNららぽーと富士見","富士見"],
+    ["01001036 FUNイオンレイクタウン","レイク"],
+    ["01001038 FUNららぽーと海老名","海老名"],
+    ["01001039 FUNイオンモールむさし村山","むさし"],
+    ["01001040 FUNららぽーと湘南平塚","平塚"],
+    ["01001041 FUNイオンモール名取","名取"],
+    ["01001042 FUNイオンモール大高","大高"],
+    ["01001043 FUNららぽーと愛知東郷","東郷町"],
+    ["01001044 FUNイオンモール太田","太田"],
+    ["01001045 FUNイオンモール水戸内原","水戸"],
+    ["01001046 FUNららぽーとEXPOCITY","EXPO"],
+    ["01001047 FUNラゾーナ川崎プラザ","川崎"],
+    ["01001048 FUNららぽーと新三郷","新三郷"],
+    ["01001049 FUNイオンモール幕張新都心","幕張"],
+    ["01001050 FUNイオンモール各務原","各務原"],
+    ["01001051 FUNららぽーと堺","堺"],
+    
+]
+
+#用途別ＣＤ
+division_CD = {
+  "01":"OP/SETUP",                                                                                            
+  "02":"羽織",
+  "03":"羽織",
+  "04":"TOPs",
+  "05":"TOPs",
+  "06":"羽織",
+  "07":"TOPs",
+  "08":"BOTTOMs",
+  "09":"BOTTOMs",
+  "10":"TOPs",
+  "11":"INN",
+  "12":"OP/SETUP",
+  "13":"ACC",
+  "15":"SH",
+  
+}
+
+
+
+item_cd_list = {
+  "OP":"01",                                                                                            
+  "CD":"02",
+  "JK":"03",
+  "KT":"04",
+  "CS":"05",
+  "CT":"06",
+  "BL":"07",
+  "SK":"08",
+  "PT":"09",
+  "TR":"10",
+  "INN":"11",
+  "SETUP":"12",
+  "ACC":"13",
+  "SH":"15",
+}            
+       
+       
+item_underprice_list = {
+  "OP":2000,                                                                                            
+  "CD":1599,
+  "JK":2599,
+  "KT":1599,
+  "CS":1599,
+  "CT":2599,
+  "BL":1599,
+  "SK":1999,
+  "PT":1999,
+  "TR":1599,
+  "INN":1299,
+  "SETUP":2599,
+  "ACC":799,
+  "SH":2599,
+}               
+
+
+
+file_path_all = "C:/Users/fun-f/Desktop/myfile/dataf/全店販売ログ.csv"#販売分析ログ
+
+r_file_all = pd.read_csv(file_path_all,encoding="cp932")
+df_r_file_all = pd.DataFrame(r_file_all)
+
+
+order_n = pd.DataFrame(df_r_file_all["伝票番号"],columns=["伝票番号"])
+item_cd = pd.DataFrame(df_r_file_all["商品コード"].astype('str').str.zfill(10).str[:10].values,columns=["商品CD"])
+item_name = pd.DataFrame(df_r_file_all["商品名"],columns=["商品名"])
+category_cd = pd.DataFrame(df_r_file_all["商品コード"].astype('str').str.zfill(10).str[2:4].values,columns=["アイテムCD"])
+quantity = pd.DataFrame(df_r_file_all["数量"].values,columns=["数量"])
+amount = pd.DataFrame(df_r_file_all["小計金額"].values,columns=["金額"])
+cost = pd.DataFrame(df_r_file_all["原価"].values,columns=["原価"])#原価
+shop_name = pd.DataFrame(df_r_file_all["店舗名"].values,columns=["店舗名"])
+
+set_data_all = pd.concat([order_n,item_cd,item_name,category_cd,quantity,amount,cost,shop_name],axis=1)
+  
+#filter_data = set_data[set_data["金額"] >= 100]
+
+filter_1_all = set_data_all[set_data_all["アイテムCD"] != "98"] #ショッパー除外
+
+filter_2_all = filter_1_all[filter_1_all["アイテムCD"] != "14"] #サンプル除外
+
+#追加コード
+filter_3_all = filter_2_all[filter_2_all["金額"] > 0 ]#返品データを削除
+
+filter_data_all = filter_3_all[filter_3_all["金額"] != 50] #マスク除外
+
+#差し引きデータ
+Pull_data_all = filter_2_all[filter_2_all["金額"] < 0 ]
+
+
+CustCD_list_all = np.unique(filter_data_all["伝票番号"].values)
+Price_list_all = np.unique(filter_data_all["金額"].values)      
+
+print("金額リスト", Price_list_all)
+
+#客単価ランキング
+def UnitPrice():
+  #====================================================
+  #単日客単価ランキングを作成
+  #====================================================
+  
+  Unit_Rank_list = []
+  OUT_FILE_PATH = "C:/Users/fun-f/Desktop/客単価ランキング.xlsx"
+  wb_UP = pyxl.load_workbook(OUT_FILE_PATH)
+  ws_UP = wb_UP["Sheet1"]  
+  for C_CD in CustCD_list_all:
+    select_data = filter_data_all[filter_data_all["伝票番号"] == C_CD ]
+    select_data_shop = select_data["店舗名"].values[0]
+    select_data_UP = sum(select_data["金額"].values)
+    select_data_qnt = sum(select_data["数量"].values)    
+    
+    Unit_Price_Data = pd.DataFrame({"店舗名":[select_data_shop],"数量":[select_data_qnt],"金額":[select_data_UP]})
+    Unit_Rank_list.append(Unit_Price_Data)
+  
+  Concat_Unit_Rank_list = pd.concat(Unit_Rank_list).sort_values("金額",ascending=False).head(20)
+
+  counter = 0
+  for row_n in Concat_Unit_Rank_list.values:
+    
+    ws_UP["B" + str(4 + counter ) ].value = row_n[0]
+    ws_UP["C" + str(4 + counter ) ].value = row_n[1]
+    ws_UP["D" + str(4 + counter ) ].value = row_n[2]
+    
+    counter += 1
+    
+  wb_UP.save(OUT_FILE_PATH)  
+    
+  
+  
+  
+  
+
+
+#アイテム別平均単価
+Item_Price_AVG = {}
+
+for cd_id in division_CD :
+  key_data_n =filter_data_all[filter_data_all["アイテムCD"] == cd_id]
+  med = np.median(key_data_n["金額"].values)
+  #filter_1 = key_data_n[key_data_n["金額"] >= 1000]
+  try:
+    std= int(np.std(key_data_n['金額'].values))
+    
+  except ValueError:
+    std = 0  
+  try:
+    filter_ = int(np.average(key_data_n["金額"].values))
+  except ValueError:
+    filter_ = 0
+  
+  #print(cd_id,'中央値',med,"平均値",filter_,'標準偏差',std)
+  Item_Price_AVG[cd_id] = filter_
+  
+print("平均単価\n",Item_Price_AVG)  
+int(np.average(filter_data_all["金額"].values))
+
+#用途別カテゴリー平均単価を設定
+op_set_price = ((Item_Price_AVG["01"] + Item_Price_AVG["12"])/2)
+tops_price = ((Item_Price_AVG["04"] + Item_Price_AVG["05"] + Item_Price_AVG["07"]+ Item_Price_AVG["10"])/4)
+bottoms_price = ((Item_Price_AVG["08"] + Item_Price_AVG["09"])/2)
+outer_price = ((Item_Price_AVG["02"] + Item_Price_AVG["03"]+ Item_Price_AVG["06"])/3)
+inn_price = 1599#Item_Price_AVG["11"] #固定値
+acc_price = 799#Item_Price_AVG["13"]　#固定値
+sh_price = Item_Price_AVG["15"]
+
+print("OP/SET⇒",op_set_price,"\nTOPs⇒",tops_price,"\nBOTTTOMs⇒",bottoms_price,"\nOUTER⇒",outer_price,"\nINNER→",inn_price,"\nACC⇒",acc_price,"\nSH⇒",sh_price)
+
+
+
+def Price_Analytics():
+  Price_zone = []
+
+  for p in Price_list:
+    print(p)
+    quantity = len(filter_data[filter_data["金額"] == p])
+    
+    p_row = pd.DataFrame({"価格": [p],"販売点数": [quantity]})
+    print(p_row)
+    Price_zone.append(p_row)
+    
+    
+  concat_price_zone = pd.concat(Price_zone)  
+  print(concat_price_zone)  
+  
+def Cust_Analytics():
+  cust_type = []
+
+  for c_cd in CustCD_list:
+
+    Basket = filter_data[filter_data["伝票番号"] == c_cd ]
+    print(Basket)
+    #価格
+    
+    #コーディネートパターン
+    
+    #
+SET_PATTURN_1_LIST_ALL = [] #OP/SET` + ACC`
+SET_PATTURN_2_LIST_ALL = [] #OP/SET` + OUTER`
+SET_PATTURN_3_LIST_ALL = [] #TOPS` + BOTTOMS`
+SET_PATTURN_4_LIST_ALL = [] #TOPS` + INN`
+SET_PATTURN_5_LIST_ALL = [] #TOPS` + `OUTER
+SET_PATTURN_6_LIST_ALL = [] #OUTER` + BOTTOMS`
+SET_PATTURN_7_LIST_ALL = [] #ACC` + BOTTOMS`
+SET_PATTURN_8_LIST_ALL = [] #OP/SET` + ACC + OUTER
+SET_PATTURN_9_LIST_ALL = [] #TOPS` + `OUTER + OUTER + (ACC or INN)
+SET_PATTURN_10_LIST_ALL = []    
+    
+for shop_key in tenpo:
+  print(shop_key)
+  
+  #customer_data = pd.read_csv('C:/Users/fun-f/Desktop/analysis/data_folder/' + shop_key[1] + '顧客データ.csv',encoding='cp932')#今週実績 
+  
+  file_path1 = "C:/Users/fun-f/Desktop/myfile/dataf/" + shop_key[1] + "販売ログ.csv"#販売分析ログ
+
+  r_file1 = pd.read_csv(file_path1,encoding="cp932")
+  df_r_file1 = pd.DataFrame(r_file1)
+
+
+  order_n = pd.DataFrame(df_r_file1["伝票番号"],columns=["伝票番号"])
+  item_cd = pd.DataFrame(df_r_file1["商品コード"].astype('str').str.zfill(10).str[:10].values,columns=["商品CD"])
+  item_name = pd.DataFrame(df_r_file1["商品名"],columns=["商品名"])
+  category_cd = pd.DataFrame(df_r_file1["商品コード"].astype('str').str.zfill(10).str[2:4].values,columns=["アイテムCD"])
+  quantity = pd.DataFrame(df_r_file1["数量"].values,columns=["数量"])
+  amount = pd.DataFrame(df_r_file1["小計金額"].values,columns=["金額"])
+  cost = pd.DataFrame(df_r_file1["原価"].values,columns=["原価"])#原価
+
+  set_data = pd.concat([order_n,item_cd,item_name,category_cd,quantity,amount,cost],axis=1)
+    
+  #filter_data = set_data[set_data["金額"] >= 100]
+
+  filter_1 = set_data[set_data["アイテムCD"] != "98"] #ショッパー除外
+
+  filter_2 = filter_1[filter_1["アイテムCD"] != "14"] #サンプル除外
+
+  #追加コード
+  filter_3 = filter_2[filter_2["金額"] > 0 ]#返品データを削除
+
+  filter_data = filter_3[filter_3["金額"] != 50] #マスク除外
+
+  #差し引きデータ
+  Pull_data = filter_2[filter_2["金額"] < 0 ]
+
+
+  CustCD_list = np.unique(filter_data["伝票番号"].values)
+  Price_list = np.unique(filter_data["金額"].values)    
+
+
+  #Cust_Analytics()
+
+  #アイテム別平均単価
+  # Item_Price_AVG = {}
+
+  # for cd_id in division_CD :
+  #   key_data_n =filter_data[filter_data["アイテムCD"] == cd_id]
+  #   med = np.median(key_data_n["金額"].values)
+  #   #filter_1 = key_data_n[key_data_n["金額"] >= 1000]
+  #   try:
+  #     std= int(np.std(key_data_n['金額'].values))
+      
+  #   except ValueError:
+  #     std = 0  
+  #   try:
+  #     filter_ = int(np.average(key_data_n["金額"].values))
+  #   except ValueError:
+  #     filter_ = 0
+    
+  #   #print(cd_id,'中央値',med,"平均値",filter_,'標準偏差',std)
+  #   Item_Price_AVG[cd_id] = filter_
+    
+  # print("平均単価\n",Item_Price_AVG)  
+  # int(np.average(filter_data["金額"].values))
+
+  # op_set_price = ((Item_Price_AVG["01"] + Item_Price_AVG["12"])/2)
+  # tops_price = ((Item_Price_AVG["04"] + Item_Price_AVG["05"] + Item_Price_AVG["07"]+ Item_Price_AVG["10"])/4)
+  # bottoms_price = ((Item_Price_AVG["08"] + Item_Price_AVG["09"])/2)
+  # outer_price = ((Item_Price_AVG["02"] + Item_Price_AVG["03"]+ Item_Price_AVG["06"])/3)
+  # inn_price = Item_Price_AVG["11"]
+  # acc_price = Item_Price_AVG["13"]
+  # sh_price = Item_Price_AVG["15"]
+
+
+  #顧客データを格納
+  CUST_DATA_LIST = {}
+  CUST_TYPE_1 = 0#相関関係あり
+  CUST_TYPE_2= 0#相関関係なし　
+  CUST_TYPE_3= 0#単品購入客数
+  CUST_TYPE_4 = 0
+
+  SET_PATTURN_1 = 0 #OP/SET` + ACC`
+  SET_PATTURN_2 = 0 #OP/SET` + OUTER`
+  SET_PATTURN_3 = 0 #TOPS` + BOTTOMS`
+  SET_PATTURN_4 = 0 #TOPS` + INN`
+  SET_PATTURN_5 = 0 #TOPS` + `OUTER
+  SET_PATTURN_6 = 0 #OUTER` + BOTTOMS`
+  SET_PATTURN_7 = 0 #ACC` + BOTTOMS`
+  SET_PATTURN_8 = 0 #OP/SET` + ACC + OUTER
+  SET_PATTURN_9 = 0 #TOPS` + `OUTER + OUTER + (ACC or INN)
+  SET_PATTURN_10 = 0
+
+  SET_PATTURN_1_LIST = [] #OP/SET` + ACC`
+  SET_PATTURN_2_LIST = [] #OP/SET` + OUTER`
+  SET_PATTURN_3_LIST = [] #TOPS` + BOTTOMS`
+  SET_PATTURN_4_LIST = [] #TOPS` + INN`
+  SET_PATTURN_5_LIST = [] #TOPS` + `OUTER
+  SET_PATTURN_6_LIST = [] #OUTER` + BOTTOMS`
+  SET_PATTURN_7_LIST = [] #ACC` + BOTTOMS`
+  SET_PATTURN_8_LIST = [] #OP/SET` + ACC + OUTER
+  SET_PATTURN_9_LIST = [] #TOPS` + `OUTER + OUTER + (ACC or INN)
+  SET_PATTURN_10_LIST = []
+
+  for i in CustCD_list:
+    key_data = filter_data[filter_data["伝票番号"] == i]#伝票番番号に一致するデータを抽出
+    data_at = sum(key_data["金額"].values)#客単価
+    data_count = len(key_data)#買上数をカウント
+    #基準値
+    #P_ALL ⇒ A
+    #P:S 5:5 ⇒ B
+    #
+    
+    
+    op_set_list = []
+    tops_list = []
+    bottoms_list = []
+    outer_list = []
+    inn_list = []
+    acc_list = []
+    sh_list = []
+    
+    #提案の相関関係が津陽
+    #タイプA
+    
+    P = 0 
+    S = 0
+    for i_2,n in zip(key_data.values,range(1,data_count + 1 )):
+      
+      if (i_2[6]/i_2[5]) < 0.3 :
+        S += 1
+        
+      else:
+        P += 1  
+        
+      
+      if (i_2[3] == "01") or (i_2[3] == "12"):
+        op_set_list.append(i_2)
+      
+      elif (i_2[3] == "04") or (i_2[3] == "05") or (i_2[3] == "07") or (i_2[3] == "10"):
+        
+        tops_list.append(i_2)
+      
+      elif (i_2[3] == "08") or (i_2[3] == "09") :
+        
+        bottoms_list.append(i_2)  
+        
+      elif (i_2[3] == "02") or (i_2[3] == "03") or (i_2[3] == "06"): 
+        
+        outer_list.append(i_2)
+        
+      elif i_2[3] == "11":
+        
+        inn_list.append(i_2)
+      
+      elif i_2[3] == "13":
+        
+        acc_list.append(i_2)      
+      
+      elif i_2[3] == "15":
+        
+        sh_list.append(i_2)
+        
+    #提案の相関関係が津陽
+    #タイプA
+    #2点SETの組み合わせ
+
+    if data_count >= 2:
+      
+      if (data_count >= 4) & (data_at >= 7500):
+        type_n = "S"  
+        CUST_TYPE_4 += 1
+        if (len(op_set_list) > 0 ) & (len(acc_list) > 0) & (len(outer_list) > 0) :
+          SET_PATTURN_8 += 1
+          SET_PATTURN_8_LIST.append(key_data)
+        elif (len(tops_list) > 0 ) & (len(bottoms_list) > 0) & (len(outer_list)) & ((len(acc_list)) or (len(inn_list))):
+          SET_PATTURN_9 += 1
+          SET_PATTURN_9_LIST.append(key_data)
+        
+        
+        
+      #OP提案の判定
+      elif (len(op_set_list) > 0 ) & (len(acc_list) > 0) & (data_at >= (op_set_price + acc_price)):
+        type_n = "A"
+        CUST_TYPE_1 += 1
+        SET_PATTURN_1 += 1
+        SET_PATTURN_1_LIST.append(key_data)
+        
+      elif (len(op_set_list) > 0 ) & (len(outer_list) > 0) & (data_at >= (op_set_price + outer_price)):
+        type_n = "A"
+        CUST_TYPE_1 += 1
+        SET_PATTURN_2 += 1
+        SET_PATTURN_2_LIST.append(key_data)
+        
+      #Tops + Bottoms 提案を判定
+      elif (len(tops_list) > 0 ) & (len(bottoms_list) > 0) & (data_at >= (tops_price + bottoms_price)) :
+        type_n = "A"  
+        CUST_TYPE_1 += 1
+        SET_PATTURN_3 += 1
+        SET_PATTURN_3_LIST.append(key_data)
+        
+      #Tops + INN 提案を判定
+      elif (len(tops_list) > 0 ) & (len(inn_list) > 0) & (data_at >= (tops_price + inn_price)) :
+        type_n = "A"    
+        CUST_TYPE_1 += 1
+        SET_PATTURN_4 += 1
+        SET_PATTURN_4_LIST.append(key_data)
+      #Outer + Tops 提案を判定
+      elif (len(outer_list) > 0 ) & (len(tops_list) > 0) & (data_at >= (outer_price + tops_price)):
+        type_n = "A"   
+        CUST_TYPE_1 += 1
+        SET_PATTURN_5 += 1
+        SET_PATTURN_5_LIST.append(key_data)
+        
+      #Outer + Tops 提案を判定
+      elif (len(outer_list) > 0 ) & (len(bottoms_list) > 0) & (data_at >= (outer_price + bottoms_price)):
+        type_n = "A"   
+        CUST_TYPE_1 += 1
+        SET_PATTURN_6 += 1
+        SET_PATTURN_6_LIST.append(key_data)
+      
+      #Bottoms + Acc 提案を判定
+      elif (len(bottoms_list) > 0 ) & (len(acc_list) > 0) & (data_at >= (bottoms_price + acc_price)):
+        type_n = "A"   
+        CUST_TYPE_1 += 1  
+        SET_PATTURN_7 += 1
+        SET_PATTURN_7_LIST.append(key_data)
+        
+      else :
+        type_n = "相関関係不明"  
+        CUST_TYPE_2 += 1
+    
+      try:  
+        PSR = "{: .1f}".format((P/data_count)*100)
+      except ZeroDivisionError:
+        PSR = 0  
+      #cust_data = {i:[[type_n,data_count,data_at],[op_set_list,tops_list,bottoms_list,outer_list,inn_list,acc_list,sh_list]]} 
+      CUST_DATA_LIST[str(i)] = [[type_n,data_count,data_at,PSR],[op_set_list,tops_list,bottoms_list,outer_list,inn_list,acc_list,sh_list]]
+    
+    else :
+      type_n = "相関関係無し"  
+      CUST_TYPE_3 += 1
+      
+      try:  
+        PSR = "{: .1f}".format((P/data_count)*100)
+      except ZeroDivisionError:
+        PSR = 0  
+      
+      CUST_DATA_LIST[str(i)] = [[type_n,data_count,data_at,PSR],[op_set_list,tops_list,bottoms_list,outer_list,inn_list,acc_list,sh_list]]
+      
+  # CONCAT_SET_PATTURN_1_LIST = pd.concat(SET_PATTURN_1_LIST)
+  # CONCAT_SET_PATTURN_2_LIST = pd.concat(SET_PATTURN_2_LIST)
+  # CONCAT_SET_PATTURN_3_LIST = pd.concat(SET_PATTURN_3_LIST)
+  # CONCAT_SET_PATTURN_4_LIST = pd.concat(SET_PATTURN_4_LIST)
+  # CONCAT_SET_PATTURN_5_LIST = pd.concat(SET_PATTURN_5_LIST)
+  # CONCAT_SET_PATTURN_6_LIST = pd.concat(SET_PATTURN_6_LIST)
+  # CONCAT_SET_PATTURN_7_LIST = pd.concat(SET_PATTURN_7_LIST)
+  # CONCAT_SET_PATTURN_8_LIST = pd.concat(SET_PATTURN_8_LIST)
+  # CONCAT_SET_PATTURN_9_LIST = pd.concat(SET_PATTURN_9_LIST)
+
+
+  ALL_CUST = CUST_TYPE_1 + CUST_TYPE_2 + CUST_TYPE_3 + CUST_TYPE_4
+
+  # ws["B" + str(3 + counter_n)].value = CUST_TYPE_1 + CUST_TYPE_4
+  # #ws["C" + str(3 + counter_n)].value = "{:.1f}".format(((CUST_TYPE_1 + CUST_TYPE_4)/ALL_CUST)*100)
+  # ws["D" + str(3 + counter_n)].value = CUST_TYPE_2
+  # #ws["E" + str(3 + counter_n)].value = "{:.1f}".format(((CUST_TYPE_2)/ALL_CUST)*100)
+  # ws["F" + str(3 + counter_n)].value = CUST_TYPE_3
+  # #ws["G" + str(3 + counter_n)].value = "{:.1f}".format((CUST_TYPE_3/ALL_CUST)*100)
+  # ws["H" + str(3 + counter_n)].value = CUST_TYPE_4
+  # #ws["I" + str(3 + counter_n)].value = "{:.1f}".format((CUST_TYPE_4/ALL_CUST)*100)
+
+  # ws["R" + str(3 + counter_n)].value = SET_PATTURN_1
+  # ws["S" + str(3 + counter_n)].value = SET_PATTURN_2
+  # ws["T" + str(3 + counter_n)].value = SET_PATTURN_3
+  # ws["U" + str(3 + counter_n)].value = SET_PATTURN_4
+  # ws["V" + str(3 + counter_n)].value = SET_PATTURN_5
+  # ws["W" + str(3 + counter_n)].value = SET_PATTURN_6
+  # ws["X" + str(3 + counter_n)].value = SET_PATTURN_7
+  # ws["Y" + str(3 + counter_n)].value = SET_PATTURN_8
+  # ws["Z" + str(3 + counter_n)].value = SET_PATTURN_9
+
+  print(
+        "相関関係あり⇒",CUST_TYPE_1 + CUST_TYPE_4,"{:.1f}".format(((CUST_TYPE_1 + CUST_TYPE_4)/ALL_CUST)*100),
+        "4点以上購入客数⇒",CUST_TYPE_4,"{:.1f}".format((CUST_TYPE_4/ALL_CUST)*100),
+        "相関関係不明⇒",CUST_TYPE_2,"{:.1f}".format(((CUST_TYPE_2)/ALL_CUST)*100),
+        "単品購入客数⇒",CUST_TYPE_3,"{:.1f}".format((CUST_TYPE_3/ALL_CUST)*100),
+        "PSR⇒",S,
+        )
+  #ショッパー抜き顧客買上データ
+  #第1項目
+  #
+  #第2項目
+  #
+  
+
+  print("コーデパターン集計\n",
+      "\nOP/SET + ACC⇒",SET_PATTURN_1,#第1項目
+      "\nOP/SET + OUTER⇒",SET_PATTURN_2,
+      "\nTOPS + BOTTOMS⇒",SET_PATTURN_3,#第1項目
+      "\nTOPS + INN⇒",SET_PATTURN_4,
+      "\nTOPS + OUTER⇒",SET_PATTURN_5,
+      "\nOUTER + BOTTOMS⇒",SET_PATTURN_6,
+      "\nACC + BOTTOMS⇒",SET_PATTURN_7,
+      "\nOP/SET + ACC + OUTER⇒",SET_PATTURN_8,#第3項目
+      "\nTOPS + BOTTOMS + OUTER + (ACC or INN)⇒",SET_PATTURN_9,
+      
+  )
+
+  
+  print(len(SET_PATTURN_1_LIST),len(SET_PATTURN_2_LIST),len(SET_PATTURN_3_LIST),len(SET_PATTURN_4_LIST),len(SET_PATTURN_5_LIST),len(SET_PATTURN_6_LIST),len(SET_PATTURN_7_LIST),)
+  if len(SET_PATTURN_1_LIST) > 0:
+    SET_PATTURN_1_LIST_ALL.append(pd.concat(SET_PATTURN_1_LIST))
+    
+  if len(SET_PATTURN_2_LIST) > 0:
+    SET_PATTURN_2_LIST_ALL.append(pd.concat(SET_PATTURN_2_LIST))
+    
+  if len(SET_PATTURN_3_LIST) > 0:
+    SET_PATTURN_3_LIST_ALL.append(pd.concat(SET_PATTURN_3_LIST))
+    
+  if len(SET_PATTURN_4_LIST) > 0:
+    SET_PATTURN_4_LIST_ALL.append(pd.concat(SET_PATTURN_4_LIST))
+    
+  if len(SET_PATTURN_5_LIST) > 0:
+    SET_PATTURN_5_LIST_ALL.append(pd.concat(SET_PATTURN_5_LIST))
+    
+  if len(SET_PATTURN_6_LIST) > 0:
+    SET_PATTURN_6_LIST_ALL.append(pd.concat(SET_PATTURN_6_LIST))
+    
+  if len(SET_PATTURN_7_LIST) > 0:
+    SET_PATTURN_7_LIST_ALL.append(pd.concat(SET_PATTURN_7_LIST))          
+  
+
+
+CONCAT_SET_PATTURN_1_LIST_ALL = pd.concat(SET_PATTURN_1_LIST_ALL)
+SET_PATTURN_1CNT = len(np.unique(CONCAT_SET_PATTURN_1_LIST_ALL["伝票番号"].values))
+SET_PATTURN_1VAL = sum(CONCAT_SET_PATTURN_1_LIST_ALL["金額"].values)
+print("金額",SET_PATTURN_1VAL)
+print("SETパターン1",SET_PATTURN_1CNT)
+# for set_cd in SET_PATTURN_1CNT:
+#   select_row = CONCAT_SET_PATTURN_1_LIST_ALL[CONCAT_SET_PATTURN_1_LIST_ALL["伝票番号"] == set_cd]
+
+
+CONCAT_SET_PATTURN_2_LIST_ALL = pd.concat(SET_PATTURN_2_LIST_ALL)
+SET_PATTURN_2CNT = len(np.unique(CONCAT_SET_PATTURN_2_LIST_ALL["伝票番号"].values))
+SET_PATTURN_2VAL = sum(CONCAT_SET_PATTURN_2_LIST_ALL["金額"].values)
+print("金額",SET_PATTURN_2VAL)
+print("SETパターン2",SET_PATTURN_2CNT)
+
+
+CONCAT_SET_PATTURN_3_LIST_ALL = pd.concat(SET_PATTURN_3_LIST_ALL)
+SET_PATTURN_3CNT = len(np.unique(CONCAT_SET_PATTURN_3_LIST_ALL["伝票番号"].values))
+SET_PATTURN_3VAL = sum(CONCAT_SET_PATTURN_3_LIST_ALL["金額"].values)
+
+for item in CONCAT_SET_PATTURN_3_LIST_ALL.values:
+  print(item)
+print("金額",SET_PATTURN_3VAL)
+print("SETパターン3",SET_PATTURN_3CNT)
+
+CONCAT_SET_PATTURN_4_LIST_ALL = pd.concat(SET_PATTURN_4_LIST_ALL)
+SET_PATTURN_4CNT = len(np.unique(CONCAT_SET_PATTURN_4_LIST_ALL["伝票番号"].values))
+SET_PATTURN_4VAL = sum(CONCAT_SET_PATTURN_4_LIST_ALL["金額"].values)
+print("金額",SET_PATTURN_4VAL)
+print("SETパターン4",SET_PATTURN_4CNT)
+
+CONCAT_SET_PATTURN_5_LIST_ALL = pd.concat(SET_PATTURN_5_LIST_ALL)
+SET_PATTURN_5CNT = len(np.unique(CONCAT_SET_PATTURN_5_LIST_ALL["伝票番号"].values))
+SET_PATTURN_5VAL = sum(CONCAT_SET_PATTURN_5_LIST_ALL["金額"].values)
+print("金額",SET_PATTURN_5VAL)
+print("SETパターン5",SET_PATTURN_5CNT)
+
+
+CONCAT_SET_PATTURN_6_LIST_ALL = pd.concat(SET_PATTURN_6_LIST_ALL)
+SET_PATTURN_6CNT = len(np.unique(CONCAT_SET_PATTURN_6_LIST_ALL["伝票番号"].values))
+SET_PATTURN_6VAL = sum(CONCAT_SET_PATTURN_6_LIST_ALL["金額"].values)
+print("金額",SET_PATTURN_6VAL)
+print("SETパターン6",SET_PATTURN_6CNT)
+
+
+CONCAT_SET_PATTURN_7_LIST_ALL = pd.concat(SET_PATTURN_7_LIST_ALL)
+SET_PATTURN_7CNT = len(np.unique(CONCAT_SET_PATTURN_7_LIST_ALL["伝票番号"].values))
+SET_PATTURN_7VAL = sum(CONCAT_SET_PATTURN_7_LIST_ALL["金額"].values)
+print("金額",SET_PATTURN_7VAL)
+print("SETパターン7",SET_PATTURN_7CNT)
+
+
+unq_PATTURN_3 = np.unique(CONCAT_SET_PATTURN_3_LIST_ALL["商品CD"].values)
+rank_PATTURN_3 = []
+for u_cd in unq_PATTURN_3:
+  key_data_p3 = CONCAT_SET_PATTURN_3_LIST_ALL[CONCAT_SET_PATTURN_3_LIST_ALL["商品CD"] == u_cd]
+
+  key_datarow_p3 = pd.DataFrame({
+                                "商品CD":[u_cd],
+                                "商品名":[key_data_p3["商品名"].values[0]],
+                                "点数":[sum(key_data_p3["数量"].values)],
+                                "金額":[sum(key_data_p3["金額"].values)],
+                                 })
+  
+  rank_PATTURN_3.append(key_datarow_p3)
+
+concat_rank_PATTURN_3 = pd.concat(rank_PATTURN_3).sort_values("金額",ascending=False)
+print(concat_rank_PATTURN_3)   
+  
+  
+UnitPrice()  
+
+
+
+
+
+  
